@@ -2,9 +2,16 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import sqlite3
 import os
+import time
 
-# Porta dinâmica para Railway
 PORT = int(os.environ.get('PORT', 9001))
+
+def get_db():
+    """Conexão SQLite com configurações otimizadas"""
+    conn = sqlite3.connect('db/verte.db', timeout=30.0, check_same_thread=False)
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA busy_timeout=30000')
+    return conn
 
 class Handler(BaseHTTPRequestHandler):
     def _set_headers(self, status=200):
@@ -20,43 +27,53 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/cadastro':
-            try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data.decode('utf-8'))
-                
-                conn = sqlite3.connect('db/verte.db')
-                c = conn.cursor()
-                
-                tipo = data.get('tipo')
-                
-                if tipo == 'cliente':
-                    c.execute("INSERT INTO clientes (nome, sobrenome, email, senha) VALUES (?, ?, ?, ?)",
-                             (data['nome'], data['sobrenome'], data['email'], data['senha']))
-                    redirect = '/app/home.html'
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length)
+                    data = json.loads(post_data.decode('utf-8'))
                     
-                elif tipo == 'parceiro':
-                    c.execute("INSERT INTO parceiros (nome, cpf, email, telefone, veiculo, placa) VALUES (?, ?, ?, ?, ?, ?)",
-                             (data['nome'], data['cpf'], data['email'], data['telefone'], data['veiculo'], data.get('placa', '')))
-                    redirect = '/miniapps/parceiro.html'
+                    conn = get_db()
+                    c = conn.cursor()
                     
-                elif tipo == 'empreendedor':
-                    cpf_cnpj = data.get('cpf') or data.get('cnpj')
-                    c.execute("INSERT INTO empreendedores (nome, email, telefone, cnpj, nome_empresa, categoria) VALUES (?, ?, ?, ?, ?, ?)",
-                             (data['nome'], data['email'], data['telefone'], cpf_cnpj, 
-                              data.get('nome_empresa', data['nome']), data['categoria']))
-                    redirect = '/miniapps/empreendedor.html'
-                
-                conn.commit()
-                conn.close()
-                
-                self._set_headers()
-                response = {'status': 'success', 'message': 'Cadastro realizado!', 'redirect': redirect}
-                self.wfile.write(json.dumps(response).encode())
-                
-            except Exception as e:
-                self._set_headers(500)
-                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
+                    tipo = data.get('tipo')
+                    
+                    if tipo == 'cliente':
+                        c.execute("INSERT INTO clientes (nome, sobrenome, email, senha) VALUES (?, ?, ?, ?)",
+                                 (data['nome'], data['sobrenome'], data['email'], data['senha']))
+                        redirect = '/app/home.html'
+                        
+                    elif tipo == 'parceiro':
+                        c.execute("INSERT INTO parceiros (nome, cpf, email, telefone, veiculo, placa) VALUES (?, ?, ?, ?, ?, ?)",
+                                 (data['nome'], data['cpf'], data['email'], data['telefone'], data['veiculo'], data.get('placa', '')))
+                        redirect = '/miniapps/parceiro.html'
+                        
+                    elif tipo == 'empreendedor':
+                        cpf_cnpj = data.get('cpf') or data.get('cnpj')
+                        c.execute("INSERT INTO empreendedores (nome, email, telefone, cnpj, nome_empresa, categoria) VALUES (?, ?, ?, ?, ?, ?)",
+                                 (data['nome'], data['email'], data['telefone'], cpf_cnpj, 
+                                  data.get('nome_empresa', data['nome']), data['categoria']))
+                        redirect = '/miniapps/empreendedor.html'
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    self._set_headers()
+                    response = {'status': 'success', 'message': 'Cadastro realizado!', 'redirect': redirect}
+                    self.wfile.write(json.dumps(response).encode())
+                    return
+                    
+                except sqlite3.OperationalError as e:
+                    if 'locked' in str(e) and attempt < max_retries - 1:
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        raise
+                except Exception as e:
+                    self._set_headers(500)
+                    self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
+                    return
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'status': 'error', 'message': 'Not Found'}).encode())
