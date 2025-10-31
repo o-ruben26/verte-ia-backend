@@ -3,10 +3,10 @@ import json
 import sqlite3
 import os
 import time
-from anthropic import Anthropic
+import requests
 
 PORT = int(os.environ.get('PORT', 10000))
-ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 
 def get_db():
     """Conexão SQLite com configurações otimizadas"""
@@ -100,39 +100,49 @@ class Handler(BaseHTTPRequestHandler):
                 message = data.get('message', '')
                 
                 # Verificar se tem API Key
-                if not ANTHROPIC_API_KEY:
-                    response_text = 'Desculpe, a API do Claude não está configurada. Por favor, configure a variável ANTHROPIC_API_KEY no Render.'
+                if not DEEPSEEK_API_KEY:
+                    response_text = 'Desculpe, a API do DeepSeek não está configurada. Por favor, configure a variável DEEPSEEK_API_KEY no Render.'
                 else:
                     try:
-                        # Usar Claude API
-                        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+                        # Usar DeepSeek API
+                        headers = {
+                            'Content-Type': 'application/json',
+                            'Authorization': f'Bearer {DEEPSEEK_API_KEY}'
+                        }
                         
-                        completion = client.messages.create(
-                            model="claude-3-5-sonnet-20241022",
-                            max_tokens=1024,
-                            messages=[
+                        payload = {
+                            "model": "deepseek-chat",
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": "Você é a ARIA, a assistente de voz inteligente da plataforma Verte IA - uma plataforma de delivery sustentável que conecta clientes, parceiros entregadores e empreendedores locais. Seja amigável, prestativa e objetiva. Responda de forma clara e natural, usando linguagem casual mas profissional. Mantenha respostas curtas (máximo 2-3 frases)."
+                                },
                                 {
                                     "role": "user",
-                                    "content": f"""Você é a ARIA, a assistente de voz inteligente da plataforma Verte IA - uma plataforma de delivery sustentável que conecta clientes, parceiros entregadores e empreendedores locais.
-
-Sua personalidade:
-- Amigável, prestativa e objetiva
-- Responde de forma clara e natural
-- Usa linguagem casual mas profissional
-- Respostas curtas (máximo 2-3 frases)
-
-Usuário perguntou: {message}
-
-Responda de forma natural e útil:"""
+                                    "content": message
                                 }
-                            ]
+                            ],
+                            "max_tokens": 200,
+                            "temperature": 0.7
+                        }
+                        
+                        response = requests.post(
+                            'https://api.deepseek.com/v1/chat/completions',
+                            headers=headers,
+                            json=payload,
+                            timeout=30
                         )
                         
-                        response_text = completion.content[0].text
+                        if response.status_code == 200:
+                            result = response.json()
+                            response_text = result['choices'][0]['message']['content']
+                        else:
+                            print(f"Erro DeepSeek: {response.status_code} - {response.text}")
+                            response_text = "Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
                         
                     except Exception as e:
-                        print(f"Erro na API do Claude: {e}")
-                        response_text = f"Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
+                        print(f"Erro na API do DeepSeek: {e}")
+                        response_text = "Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
                 
                 self._set_headers()
                 response = {'status': 'success', 'response': response_text}
@@ -149,5 +159,5 @@ Responda de forma natural e útil:"""
             self.wfile.write(json.dumps({'status': 'error', 'message': 'Not Found'}).encode())
 
 print(f'🚀 Servidor rodando na porta {PORT}')
-print(f'🤖 Claude API: {"✅ Configurada" if ANTHROPIC_API_KEY else "❌ Não configurada"}')
+print(f'🤖 DeepSeek API: {"✅ Configurada" if DEEPSEEK_API_KEY else "❌ Não configurada"}')
 HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
