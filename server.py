@@ -4,7 +4,7 @@ import sqlite3
 import os
 import time
 
-PORT = int(os.environ.get('PORT', 9001))
+PORT = int(os.environ.get('PORT', 10000))
 
 def get_db():
     """Conexão SQLite com configurações otimizadas"""
