@@ -25,6 +25,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._set_headers()
 
+    def do_HEAD(self):
+        """Suporte para requisições HEAD (health checks)"""
+        self._set_headers()
+
+    def do_GET(self):
+        """Suporte para requisições GET (health checks)"""
+        if self.path == '/' or self.path == '/health':
+            self._set_headers()
+            response = {'status': 'ok', 'message': 'Server is running'}
+            self.wfile.write(json.dumps(response).encode())
+        else:
+            self._set_headers(404)
+            self.wfile.write(json.dumps({'status': 'error', 'message': 'Not Found'}).encode())
+
     def do_POST(self):
         if self.path == '/cadastro':
             max_retries = 3
