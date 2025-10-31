@@ -3,8 +3,10 @@ import json
 import sqlite3
 import os
 import time
+from anthropic import Anthropic
 
 PORT = int(os.environ.get('PORT', 10000))
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
 def get_db():
     """Conexão SQLite com configurações otimizadas"""
@@ -95,27 +97,42 @@ class Handler(BaseHTTPRequestHandler):
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data.decode('utf-8'))
                 
-                message = data.get('message', '').lower()
+                message = data.get('message', '')
                 
-                # Respostas da ARIA (você pode conectar com IA depois)
-                responses = {
-                    'olá': 'Olá! Eu sou a ARIA, sua assistente virtual da Verte IA. Como posso ajudar você hoje?',
-                    'oi': 'Oi! Tudo bem? Eu sou a ARIA. O que você gostaria de saber?',
-                    'quem é você': 'Eu sou a ARIA, a assistente de voz inteligente da plataforma Verte IA. Fui criada para ajudar você a navegar e usar nossos serviços de forma mais fácil e natural.',
-                    'ajuda': 'Claro! Posso te ajudar com cadastros, busca de lojas, informações sobre parceiros e muito mais. O que você precisa?',
-                    'obrigado': 'Por nada! Estou sempre aqui para ajudar. Volte sempre que precisar!',
-                    'tchau': 'Até logo! Foi um prazer ajudar você. Volte sempre que quiser!',
-                }
-                
-                # Procurar resposta
-                response_text = None
-                for key in responses:
-                    if key in message:
-                        response_text = responses[key]
-                        break
-                
-                if not response_text:
-                    response_text = 'Desculpe, não entendi muito bem. Pode reformular sua pergunta? Estou aqui para ajudar com informações sobre a Verte IA!'
+                # Verificar se tem API Key
+                if not ANTHROPIC_API_KEY:
+                    response_text = 'Desculpe, a API do Claude não está configurada. Por favor, configure a variável ANTHROPIC_API_KEY no Render.'
+                else:
+                    try:
+                        # Usar Claude API
+                        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+                        
+                        completion = client.messages.create(
+                            model="claude-3-5-sonnet-20241022",
+                            max_tokens=1024,
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": f"""Você é a ARIA, a assistente de voz inteligente da plataforma Verte IA - uma plataforma de delivery sustentável que conecta clientes, parceiros entregadores e empreendedores locais.
+
+Sua personalidade:
+- Amigável, prestativa e objetiva
+- Responde de forma clara e natural
+- Usa linguagem casual mas profissional
+- Respostas curtas (máximo 2-3 frases)
+
+Usuário perguntou: {message}
+
+Responda de forma natural e útil:"""
+                                }
+                            ]
+                        )
+                        
+                        response_text = completion.content[0].text
+                        
+                    except Exception as e:
+                        print(f"Erro na API do Claude: {e}")
+                        response_text = f"Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
                 
                 self._set_headers()
                 response = {'status': 'success', 'response': response_text}
@@ -123,6 +140,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
                 
             except Exception as e:
+                print(f"Erro geral: {e}")
                 self._set_headers(500)
                 self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
                 return
@@ -131,4 +149,5 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'status': 'error', 'message': 'Not Found'}).encode())
 
 print(f'🚀 Servidor rodando na porta {PORT}')
+print(f'🤖 Claude API: {"✅ Configurada" if ANTHROPIC_API_KEY else "❌ Não configurada"}')
 HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
