@@ -1,22 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import aria
-from dotenv import load_dotenv
+import os
 
-load_dotenv()
+app = FastAPI(title="Verte IA Backend")
 
-app = FastAPI(title="Verte IA - ARIA")
-
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["https://verte-ia-frontend.vercel.app"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Rotas
 app.include_router(aria.router, prefix="/api/v1/aria", tags=["ARIA"])
 
 @app.get("/")
 async def root():
-    return {"message": "ARIA com Hugging Face!", "status": "online"}
+    return {"message": "Verte IA Backend online!"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
