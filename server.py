@@ -6,7 +6,7 @@ import time
 import requests
 
 PORT = int(os.environ.get('PORT', 10000))
-DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 def get_db():
     """Conexão SQLite com configurações otimizadas"""
@@ -100,18 +100,18 @@ class Handler(BaseHTTPRequestHandler):
                 message = data.get('message', '')
                 
                 # Verificar se tem API Key
-                if not DEEPSEEK_API_KEY:
-                    response_text = 'Desculpe, a API do DeepSeek não está configurada. Por favor, configure a variável DEEPSEEK_API_KEY no Render.'
+                if not GROQ_API_KEY:
+                    response_text = 'Desculpe, a API do Groq não está configurada. Por favor, configure a variável GROQ_API_KEY no Render.'
                 else:
                     try:
-                        # Usar DeepSeek API
+                        # Usar Groq API
                         headers = {
                             'Content-Type': 'application/json',
-                            'Authorization': f'Bearer {DEEPSEEK_API_KEY}'
+                            'Authorization': f'Bearer {GROQ_API_KEY}'
                         }
                         
                         payload = {
-                            "model": "deepseek-chat",
+                            "model": "llama-3.1-70b-versatile",
                             "messages": [
                                 {
                                     "role": "system",
@@ -127,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
                         }
                         
                         response = requests.post(
-                            'https://api.deepseek.com/v1/chat/completions',
+                            'https://api.groq.com/openai/v1/chat/completions',
                             headers=headers,
                             json=payload,
                             timeout=30
@@ -137,11 +137,11 @@ class Handler(BaseHTTPRequestHandler):
                             result = response.json()
                             response_text = result['choices'][0]['message']['content']
                         else:
-                            print(f"Erro DeepSeek: {response.status_code} - {response.text}")
+                            print(f"Erro Groq: {response.status_code} - {response.text}")
                             response_text = "Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
                         
                     except Exception as e:
-                        print(f"Erro na API do DeepSeek: {e}")
+                        print(f"Erro na API do Groq: {e}")
                         response_text = "Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
                 
                 self._set_headers()
@@ -159,6 +159,5 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'status': 'error', 'message': 'Not Found'}).encode())
 
 print(f'🚀 Servidor rodando na porta {PORT}')
-print(f'🤖 DeepSeek API: {"✅ Configurada" if DEEPSEEK_API_KEY else "❌ Não configurada"}')
+print(f'🤖 Groq API: {"✅ Configurada" if GROQ_API_KEY else "❌ Não configurada"}')
 HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
-
