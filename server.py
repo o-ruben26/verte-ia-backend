@@ -161,3 +161,4 @@ class Handler(BaseHTTPRequestHandler):
 print(f'🚀 Servidor rodando na porta {PORT}')
 print(f'🤖 DeepSeek API: {"✅ Configurada" if DEEPSEEK_API_KEY else "❌ Não configurada"}')
 HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
+
