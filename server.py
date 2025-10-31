@@ -88,6 +88,44 @@ class Handler(BaseHTTPRequestHandler):
                     self._set_headers(500)
                     self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
                     return
+                    
+        elif self.path == '/aria':
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                message = data.get('message', '').lower()
+                
+                # Respostas da ARIA (você pode conectar com IA depois)
+                responses = {
+                    'olá': 'Olá! Eu sou a ARIA, sua assistente virtual da Verte IA. Como posso ajudar você hoje?',
+                    'oi': 'Oi! Tudo bem? Eu sou a ARIA. O que você gostaria de saber?',
+                    'quem é você': 'Eu sou a ARIA, a assistente de voz inteligente da plataforma Verte IA. Fui criada para ajudar você a navegar e usar nossos serviços de forma mais fácil e natural.',
+                    'ajuda': 'Claro! Posso te ajudar com cadastros, busca de lojas, informações sobre parceiros e muito mais. O que você precisa?',
+                    'obrigado': 'Por nada! Estou sempre aqui para ajudar. Volte sempre que precisar!',
+                    'tchau': 'Até logo! Foi um prazer ajudar você. Volte sempre que quiser!',
+                }
+                
+                # Procurar resposta
+                response_text = None
+                for key in responses:
+                    if key in message:
+                        response_text = responses[key]
+                        break
+                
+                if not response_text:
+                    response_text = 'Desculpe, não entendi muito bem. Pode reformular sua pergunta? Estou aqui para ajudar com informações sobre a Verte IA!'
+                
+                self._set_headers()
+                response = {'status': 'success', 'response': response_text}
+                self.wfile.write(json.dumps(response).encode())
+                return
+                
+            except Exception as e:
+                self._set_headers(500)
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
+                return
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'status': 'error', 'message': 'Not Found'}).encode())
