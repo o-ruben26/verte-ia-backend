@@ -1,6 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services.deepseek_service import deepseek_service
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+from services.deepseek_service import deepseek_service
 
 router = APIRouter()
 
